@@ -17,17 +17,17 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-from datetime import date, datetime, timedelta
-from getpass import getpass
+from datetime import date, timedelta
 
 import argparse
-import configparser
 import http.client as http
 import logging
 import sys
-import sunnyportal.client, sunnyportal.responses
+import sunnyportal.client
+import sunnyportal.responses
 import time
 import urllib.parse
+import os
 
 
 class PvOutput(object):
@@ -66,7 +66,9 @@ class PvOutput(object):
         }
         if power is not None:
             params["v2"] = power
-        (status, reason, body) = self.send_request("/service/r2/addstatus.jsp", params)
+        status, reason, body = self.send_request(
+            "/service/r2/addstatus.jsp", params
+        )
         if status != http.OK:
             logging.error("Failed to add status: %s", body)
             raise Exception("could not add status")
@@ -86,7 +88,7 @@ class PvOutput(object):
             )
         offset = 0
         while offset < len(data):
-            entries = data[offset : offset + 30]
+            entries = data[offset:offset+30]
             (status, reason, body) = self.send_request(
                 "/service/r2/addbatchstatus.jsp", {"data": ";".join(entries)}
             )
@@ -107,7 +109,7 @@ class PvOutput(object):
     def add_batch_output(self, data):
         offset = 0
         while offset < len(data):
-            entries = data[offset : offset + 30]
+            entries = data[offset:offset+30]
             (status, reason, body) = self.send_request(
                 "/service/r2/addbatchoutput.jsp", {"data": ";".join(entries)}
             )
@@ -155,7 +157,9 @@ def get_data_for_day(plant, date, get_consumption):
     return ",".join(str(d) for d in data).rstrip(",")
 
 
-def get_data_for_period(plant, start_date=None, end_date=None, get_consumption=False):
+def get_data_for_period(
+    plant, start_date=None, end_date=None, get_consumption=False
+):
     if start_date is None:
         start_date = plant.all_data("year").start_timestamp.date()
     if end_date is None:
@@ -173,7 +177,9 @@ def get_data_for_period(plant, start_date=None, end_date=None, get_consumption=F
 def check_positive(value):
     ivalue = int(value)
     if ivalue <= 0:
-        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+        raise argparse.ArgumentTypeError(
+            "%s is an invalid positive int value" % value
+        )
     return ivalue
 
 
@@ -182,8 +188,9 @@ def main():
         format="%(asctime)s %(levelname)s: %(message)s", level=logging.DEBUG
     )
 
-    parser = argparse.ArgumentParser(description="Connect Sunny Portal to PVoutput.org")
-    parser.add_argument("config", help="Configuration file to use")
+    parser = argparse.ArgumentParser(
+        description="Connect Sunny Portal to PVoutput.org"
+    )
     parser.add_argument(
         "-s", "--status", help="Report status(es)", action="store_true"
     )
@@ -196,11 +203,13 @@ def main():
     parser.add_argument(
         "-p",
         "--days-past",
-        help="number of DAYS in the past to go back -- default: 0 (today only)",
+        help="number of DAYS in the past to go back - default: 0 (today only)",
         type=check_positive,
         default=0,
     )
-    parser.add_argument("-q", "--quiet", help="Silence output", action="store_true")
+    parser.add_argument(
+        "-q", "--quiet", help="Silence output", action="store_true"
+    )
     parser.add_argument(
         "-n", "--dry-run", help="Don't send any data", action="store_true"
     )
@@ -209,25 +218,16 @@ def main():
     if args.quiet:
         logging.disable(logging.DEBUG)
 
-    config = configparser.ConfigParser()
-    config["sunnyportal"] = {}
-    config["pvoutput"] = {}
-    config.read(args.config)
-
-    modified = False
-    if not config["sunnyportal"].get("email"):
-        config["sunnyportal"]["email"] = input("Sunny Portal e-mail: ")
-        modified = True
-    if not config["sunnyportal"].get("password"):
-        config["sunnyportal"]["password"] = getpass("Sunny Portal password: ")
-        modified = True
-
-    if not config["pvoutput"].get("apikey"):
-        config["pvoutput"]["apikey"] = input("PVOutput API key: ")
-        modified = True
-    if not config["pvoutput"].get("systemid"):
-        config["pvoutput"]["systemid"] = input("PVOutput System Id: ")
-        modified = True
+    config = dict()
+    config["sunnyportal"] = dict(
+        email=os.environ.get('SP_EMAIL'),
+        password=os.environ.get('SP_PASSWORD'),
+        plant=os.environ.get('SP_PLANT')
+    )
+    config["pvoutput"] = dict(
+        apikey=os.environ.get('PVO_APIKEY'),
+        systemid=os.environ.get('PVO_SYSTEMID'),
+    )
 
     client = sunnyportal.client.Client(
         config["sunnyportal"]["email"], config["sunnyportal"]["password"]
@@ -240,29 +240,16 @@ def main():
 
     plant_oid = config["sunnyportal"].get("plant")
     if not plant_oid:
-        index = 1
-        if len(plants) > 1:
-            print("Found %d plants" % len(plants))
-            for i, plant in enumerate(plants):
-                print("%d: %s" % (i + 1, plant.name))
-            index = int(input("Enter number for the plant to use: "))
-        plant_oid = plants[index - 1].oid
-        config["sunnyportal"]["plant"] = plant_oid
-        modified = True
-
-    if modified:
-        with open(args.config, "w") as configfile:
-            config.write(configfile)
-
-    for plant in plants:
-        if plant.oid == plant_oid:
-            break
+        plant = plants[0]
     else:
-        logging.error("Configured plant not found")
-        sys.exit(1)
+        for plant in plants:
+            if plant.oid == plant_oid:
+                break
 
     pvoutput = PvOutput(
-        config["pvoutput"]["apikey"], config["pvoutput"]["systemid"], args.dry_run
+        config["pvoutput"]["apikey"],
+        config["pvoutput"]["systemid"],
+        args.dry_run
     )
 
     if args.status:

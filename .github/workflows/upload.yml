@@ -1,0 +1,26 @@
+name: Upload to pvoutput
+
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+    - cron:  '00 */2 * * *'
+
+jobs:
+  scheduled:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out this repo
+      uses: actions/checkout@v2
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Run upload
+      run: bin/sunnyportal2pvoutput -o -s -c
+      env:
+        SP_EMAIL: ${{ secrets.SP_EMAIL}}
+        SP_PASSWORD: ${{ secrets.SP_PASSWORD}}
+        SP_PLANT: ${{ secrets.SP_PLANT}}
+        PVO_APIKEY: ${{ secrets.PVO_APIKEY}}
+        PVO_SYSTEMID: ${{ secrets.PVO_SYSTEMID}}
