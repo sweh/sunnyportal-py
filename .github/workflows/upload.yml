@@ -17,7 +17,7 @@ jobs:
       with:
         python-version: 3.7
     - name: Run upload
-      run: bin/sunnyportal2pvoutput -o -s -c
+      run: PYTHONPATH=$GITHUB_WORKSPACE bin/sunnyportal2pvoutput -o -s -c
       env:
         SP_EMAIL: ${{ secrets.SP_EMAIL}}
         SP_PASSWORD: ${{ secrets.SP_PASSWORD}}
