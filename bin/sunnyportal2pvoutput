@@ -96,6 +96,10 @@ class PvOutput(object):
                     time.sleep(10)
             elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
+            elif status == 400 and "Moon Powered" in body:
+                offset += len(entries)
+                if offset < len(data):
+                    time.sleep(10)
             else:
                 logging.error("Failed to add status batch: %s", body)
                 raise Exception("could not add status batch")
@@ -113,6 +117,10 @@ class PvOutput(object):
                     time.sleep(10)
             elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
+            elif status == 400 and "Moon Powered" in body:
+                offset += len(entries)
+                if offset < len(data):
+                    time.sleep(10)
             else:
                 logging.error("Failed to add output batch: %s", body)
                 raise Exception("could not add output batch")
